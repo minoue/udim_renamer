@@ -80,6 +80,7 @@ window.title="UDIM renamer"
 
 var mainContainer = newLayoutContainer(Layout_Vertical)
 
+var topContainer = newLayoutContainer(Layout_Horizontal)
 var typeContainer = newLayoutContainer(Layout_Horizontal)
 var renameContainer = newLayoutContainer(Layout_Horizontal)
 
@@ -88,8 +89,10 @@ window.add(mainContainer)
 var ColorDisabled = Color(red: 200, green: 200, blue: 200)
 var ColorWhite = Color(red: 255, green: 255, blue: 255)
 
-var openButton = newButton("Open ...")
-var clearButton = newButton("Clear")
+var openButton = newButton("Select Files ...")
+openButton.widthMode=WidthMode_Expand
+var clearButton = newButton("Clear list")
+clearButton.widthMode=WidthMode_Expand
 var fileListArea = newTextArea()
 fileListArea.editable=false
 
@@ -107,6 +110,9 @@ renameField.setBackgroundColor(ColorDisabled)
 var renameButton = newButton("Rename textures")
 renameButton.widthMode = WidthMode_Expand
 
+topContainer.add(openButton)
+topContainer.add(clearButton)
+
 typeContainer.add(newLabel("from: "))
 typeContainer.add(fromCombobox)
 typeContainer.add(newLabel("to: "))
@@ -115,8 +121,7 @@ typeContainer.add(toCombobox)
 renameContainer.add(renameCheckbox)
 renameContainer.add(renameField)
 
-mainContainer.add(openButton)
-mainContainer.add(clearButton)
+mainContainer.add(topContainer)
 mainContainer.add(fileListArea)
 mainContainer.add(typeContainer)
 mainContainer.add(renameContainer)
@@ -153,8 +158,8 @@ proc rename() =
     let dir = pathSplit.dir
     let ext = pathSplit.ext
 
-    var uvValue = ""
-    var nameBody = ""
+    var uvValue: string
+    var nameBody: string
 
     if fromType == "Mari":
       nameBody = split(name, ".")[0]
@@ -165,8 +170,8 @@ proc rename() =
 
     let newType = convertType(fromType, toType, uvValue)
 
-    var newBody = ""
-    var newPath = ""
+    var newBody: string
+    var newPath: string
 
     if renameCheckbox.checked():
       nameBody = renameField.text()
