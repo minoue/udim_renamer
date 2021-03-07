@@ -1,7 +1,8 @@
 import os
 import strutils
 import nigui
-
+import nigui/msgbox
+import strformat
 
 proc mariToMudbox(udim: string): string =
 
@@ -136,20 +137,12 @@ openButton.onClick = proc(event: ClickEvent) =
     for file in dialog.files:
       fileListArea.addLine(file)
 
-proc rename() =
-  let fileList = fileListArea.text
+proc convertNames(textures_old: seq[string], fromType: string, toType: string): seq[string] =
 
-  if fileList == "":
-    # Empty
-    return
+  # output container for return
+  var textures_new: seq[string] = @[]
 
-  let fromType = fromCombobox.value
-  let toType = toCombobox.value
-
-  let textures = splitLines(fileList)
-
-  for tex in textures:
-
+  for tex in textures_old:
     if not fileExists(tex):
       continue
 
@@ -162,11 +155,14 @@ proc rename() =
     var nameBody: string
 
     if fromType == "Mari":
-      nameBody = split(name, ".")[0]
-      uvValue = split(name, ".")[1]
+      nameBody = name[0..^5]
+      uvValue = name[^4..^1]
     else:
+      nameBody = name[0..^7]
       uvValue = name[^6..^1]
-      nameBody = rsplit(name, uvValue, maxsplit=1)[0]
+
+    if endsWith(nameBody, "."):
+      nameBody = nameBody.rsplit('.')[0]
 
     let newType = convertType(fromType, toType, uvValue)
 
@@ -183,7 +179,11 @@ proc rename() =
 
     newPath = joinPath(dir, newBody)
 
-    moveFile(tex, newPath)
+    textures_new.add(newPath)
+
+
+  return textures_new
+
 
 renameCheckbox.onClick=proc(event: ClickEvent) =
   if renameCheckbox.checked():
@@ -194,7 +194,42 @@ renameCheckbox.onClick=proc(event: ClickEvent) =
     renameField.setBackgroundColor(ColorWhite)
 
 renameButton.onClick=proc(event: ClickEvent) =
-  rename()
 
+  let fromType = fromCombobox.value
+  let toType = toCombobox.value
+  if fromType == toType:
+    window.alert("Input type and output type is same.\nChoose different texture types.")
+    return
+
+  let textAreaStr = fileListArea.text
+  if textAreaStr == "":
+    window.alert("No textures are loaded")
+    return
+
+  let textures_old = splitLines(textAreaStr)
+
+  var textures_new: seq[string]
+
+  try:
+    textures_new = convertNames(textures_old, fromType, toType)
+  except Exception:
+    window.alert("Failed. Make sure setup is correct.")
+    return
+
+  var previewString: string = "Textures will be renamed as follows. \n\n"
+
+  for i, x in textures_new:
+    var oldName = splitPath(textures_old[i]).tail
+    var newName = splitPath(x).tail
+    previewString.add(fmt("{oldName} ---> {newName}  \n"))
+
+  let res = window.msgBox(previewString, "Rename", "Ok", "Cancel")
+
+  if res == 1:
+    for i, x in textures_new:
+      var oldName = textures_old[i]
+      var newName = x
+      moveFile(oldName, newName)
+  
 window.show()
 app.run()
