@@ -1,2 +1,4 @@
 /build
 *.exe
+.DS_Store
+/udim_renamer
