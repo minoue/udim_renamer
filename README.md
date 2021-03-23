@@ -1,6 +1,12 @@
-# Texture renamer
+# UDIM renamer
 
-# Requirement
+standalone simple renamer
+
+![windows](img/windows.png)
+
+![linux](img/linux.png)
+
+## Requirement
 
 [nigui](https://github.com/trustable-code/NiGui)
 
