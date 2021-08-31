@@ -3,74 +3,27 @@ import strutils
 import nigui
 import nigui/msgbox
 import strformat
+import udim_convert
+from sequtils import zip
 
-proc mariToMudbox(udim: string): string =
-
-  var u = parseInt($udim[3])
-  var v = parseInt($udim[1..2]) + 1
-  if u == 0:
-    u = 10
-    v = v - 1
-  return "_u$1_v$2".format($u, $v)
-
-proc mariToZBrush(udim: string): string =
-
-  var u = parseInt($udim[3])
-  var v = parseInt($udim[1..2]) + 1
-  if u == 0:
-    u = 10
-    v = v - 1
-  u -= 1
-  v -= 1
-  return "_u$1_v$2".format($u, $v)
-
-proc mudboxToMari(u: int, v: int): string =
-
-  return $(1000 + u + (v * 10 - 10))
-
-proc mudboxToZBrush(u: int, v: int): string =
-
-  return "_u$1_v$2".format(u-1, v-1)
-
-proc zbrushToMari(u: int, v:int): string =
-
-  let u2 = u + 1
-  let v2 = v + 1
-
-  return $(1000 + u2 + (v2 * 10 - 10))
-
-proc zbrushToMudbox(u: int, v: int): string =
-
-  return "_u$1_v$2".format(u+1, v+1)
 
 proc convertType(inputType, outputType, value: string): string =
 
   if inputType == "Mari":
     if outputType == "Mudbox":
-      # Mari -> Mudbox
       return mariToMudbox(value)
     else:
-      # Mari -> ZBrush
       return mariToZBrush(value)
   elif inputType == "Mudbox":
-    var u = parseInt($split(value, '_')[^2][^1])
-    var v = parseInt($split(value, '_')[^1][^1])
-
     if outputType == "Mari":
-      # Mudbox -> Mari
-      return mudboxToMari(u, v)
+      return mudboxToMari(value)
     else:
-      # Mudbox -> ZBrush
-      return mudboxToZBrush(u, v)
+      return mudboxToZBrush(value)
   else:
-    var u = parseInt($split(value, '_')[^2][^1])
-    var v = parseInt($split(value, '_')[^1][^1])
     if outputType == "Mari":
-      # ZBrush -> Mari
-      return zbrushToMari(u, v)
+      return zbrushToMari(value)
     else:
-      # ZBrush -> Mudbox
-      return zbrushToMudbox(u, v)
+      return zbrushToMudbox(value)
 
 
 # GUI
@@ -82,6 +35,7 @@ window.title="UDIM renamer"
 var mainContainer = newLayoutContainer(Layout_Vertical)
 
 var topContainer = newLayoutContainer(Layout_Horizontal)
+var listContainer = newLayoutContainer(Layout_Horizontal)
 var typeContainer = newLayoutContainer(Layout_Horizontal)
 var renameContainer = newLayoutContainer(Layout_Horizontal)
 
@@ -94,11 +48,15 @@ var openButton = newButton("Select Files ...")
 openButton.widthMode=WidthMode_Expand
 var clearButton = newButton("Clear list")
 clearButton.widthMode=WidthMode_Expand
-var fileListArea = newTextArea()
-fileListArea.editable=false
+
+var fileListAreaBefore = newTextArea()
+fileListAreaBefore.editable=false
+var fileListAreaAfter = newTextArea()
+fileListAreaAfter.editable=false
 
 clearButton.onClick=proc(event: ClickEvent) =
-  fileListArea.text=""
+  fileListAreaBefore.text=""
+  fileListAreaAfter.text=""
 
 var fromCombobox = newComboBox(@["Mudbox", "Mari", "ZBrush"])
 fromCombobox.widthMode=WidthMode_Expand
@@ -114,6 +72,9 @@ renameButton.widthMode = WidthMode_Expand
 topContainer.add(openButton)
 topContainer.add(clearButton)
 
+listContainer.add(fileListAreaBefore)
+listContainer.add(fileListAreaAfter)
+
 typeContainer.add(newLabel("from: "))
 typeContainer.add(fromCombobox)
 typeContainer.add(newLabel("to: "))
@@ -123,19 +84,10 @@ renameContainer.add(renameCheckbox)
 renameContainer.add(renameField)
 
 mainContainer.add(topContainer)
-mainContainer.add(fileListArea)
+mainContainer.add(listContainer)
 mainContainer.add(typeContainer)
 mainContainer.add(renameContainer)
 mainContainer.add(renameButton)
-
-openButton.onClick = proc(event: ClickEvent) =
-  var dialog = newOpenFileDialog()
-  dialog.title = "Select textures"
-  dialog.multiple = true
-  dialog.run()
-  if dialog.files.len > 0:
-    for file in dialog.files:
-      fileListArea.addLine(file)
 
 proc convertNames(textures_old: seq[string], fromType: string, toType: string): seq[string] =
 
@@ -180,10 +132,51 @@ proc convertNames(textures_old: seq[string], fromType: string, toType: string): 
     newPath = joinPath(dir, newBody)
 
     textures_new.add(newPath)
-
-
   return textures_new
 
+proc getNewNames() =
+  let fromType = fromCombobox.value
+  let toType = toCombobox.value
+  if fromType == toType:
+    fileListAreaAfter.text=""
+    return
+
+  let textAreaStr = fileListAreaBefore.text
+  if textAreaStr == "":
+    return
+
+  let textures_old = splitLines(textAreaStr)
+
+  var textures_new: seq[string]
+
+  try:
+    textures_new = convertNames(textures_old, fromType, toType)
+  except Exception:
+    window.alert("Failed to convert names. Change the from/to setting.")
+    return
+
+  fileListAreaAfter.text=""
+  if textures_new.len > 0:
+    for newName in textures_new:
+      fileListAreaAfter.addLine(newName)
+
+
+openButton.onClick = proc(event: ClickEvent) =
+  var dialog = newOpenFileDialog()
+  dialog.title = "Select textures"
+  dialog.multiple = true
+  dialog.run()
+  if dialog.files.len > 0:
+    for file in dialog.files:
+      fileListAreaBefore.addLine(file)
+
+  getNewNames()
+
+fromCombobox.onChange=proc(event: ComboBoxChangeEvent) =
+  getNewNames()
+
+toCombobox.onChange=proc(event: ComboBoxChangeEvent) =
+  getNewNames()
 
 renameCheckbox.onClick=proc(event: ClickEvent) =
   if renameCheckbox.checked():
@@ -195,41 +188,37 @@ renameCheckbox.onClick=proc(event: ClickEvent) =
 
 renameButton.onClick=proc(event: ClickEvent) =
 
-  let fromType = fromCombobox.value
-  let toType = toCombobox.value
-  if fromType == toType:
-    window.alert("Input type and output type is same.\nChoose different texture types.")
-    return
+  # let fromType = fromCombobox.value
+  # let toType = toCombobox.value
+  # if fromType == toType:
+  #   window.alert("Input type and output type is same.\nChoose different texture types.")
+  #   return
 
-  let textAreaStr = fileListArea.text
+  let textAreaStr = fileListAreaBefore.text
   if textAreaStr == "":
     window.alert("No textures are loaded")
     return
 
   let textures_old = splitLines(textAreaStr)
 
-  var textures_new: seq[string]
-
-  try:
-    textures_new = convertNames(textures_old, fromType, toType)
-  except Exception:
-    window.alert("Failed. Make sure setup is correct.")
+  let textAreaStrAfter = fileListAreaAfter.text
+  if textAreaStrAfter == "":
+    window.alert("No outputs defined")
     return
 
-  var previewString: string = "Textures will be renamed as follows. \n\n"
+  let textures_new = splitLines(textAreaStrAfter)
 
-  for i, x in textures_new:
-    var oldName = splitPath(textures_old[i]).tail
-    var newName = splitPath(x).tail
-    previewString.add(fmt("{oldName} ---> {newName}  \n"))
-
-  let res = window.msgBox(previewString, "Rename", "Ok", "Cancel")
+  let res = window.msgBox("Rename Textures? ____ ", "Rename", "Ok", "Cancel")
 
   if res == 1:
-    for i, x in textures_new:
-      var oldName = textures_old[i]
-      var newName = x
-      moveFile(oldName, newName)
-  
+    for pair in zip(textures_old, textures_new):
+        let (o, n) = pair
+        if fileExists(o):
+          moveFile(o, n)
+        else:
+          echo fmt("{o} doesn't exist. Skipped")
+
+    window.msgBox("Done")
+
 window.show()
 app.run()
