@@ -231,6 +231,15 @@ renameField.onTextChange=proc(event: TextChangeEvent) =
   else:
     discard
 
+renameCheckbox.onToggle=proc(event: ToggleEvent) =
+
+  if renameCheckbox.checked():
+    let name = renameField.text
+    getNewNames(some(name))
+  else:
+    getNewNames()
+
+
 renameButton.onClick=proc(event: ClickEvent) =
 
 
