@@ -1,5 +1,6 @@
 import os
 import strutils
+import options
 import nigui
 import nigui/msgbox
 import strformat
@@ -64,8 +65,6 @@ var toCombobox = newComboBox(@["Mari", "Mudbox", "ZBrush"])
 toCombobox.widthMode=WidthMode_Expand
 var renameCheckbox = newCheckbox("Rename")
 var renameField = newTextBox()
-renameField.editable=false
-renameField.setBackgroundColor(ColorDisabled)
 var renameButton = newButton("Rename textures")
 renameButton.widthMode = WidthMode_Expand
 
@@ -134,7 +133,50 @@ proc convertNames(textures_old: seq[string], fromType: string, toType: string): 
     textures_new.add(newPath)
   return textures_new
 
-proc getNewNames() =
+proc replaceNames(textures_old: seq[string], fromType: string, toType: string, newNameBody: string): seq[string] =
+
+  # output container for return
+  var textures_new: seq[string] = @[]
+
+  for tex in textures_old:
+    if not fileExists(tex):
+      continue
+
+    let pathSplit = splitFile(tex)
+    let name = pathSplit.name
+    let dir = pathSplit.dir
+    let ext = pathSplit.ext
+
+    var uvValue: string
+    var nameBody: string
+
+    if fromType == "Mari":
+      nameBody = name[0..^5]
+      uvValue = name[^4..^1]
+    else:
+      nameBody = name[0..^7]
+      uvValue = name[^6..^1]
+
+    if endsWith(nameBody, "."):
+      nameBody = nameBody.rsplit('.')[0]
+
+    let newType = convertType(fromType, toType, uvValue)
+
+    var newBody: string
+    var newPath: string
+
+    if toType == "Mari":
+      newBody = newNameBody & "." & newType & ext
+    else:
+      newBody = newNameBody & newType & ext
+
+    newPath = joinPath(dir, newBody)
+
+    textures_new.add(newPath)
+  return textures_new
+
+proc getNewNames(nameBody = none(string)) =
+  
   let fromType = fromCombobox.value
   let toType = toCombobox.value
   if fromType == toType:
@@ -150,7 +192,10 @@ proc getNewNames() =
   var textures_new: seq[string]
 
   try:
-    textures_new = convertNames(textures_old, fromType, toType)
+    if nameBody.isSome:
+      textures_new = replaceNames(textures_old, fromType, toType, nameBody.get)
+    else:
+      textures_new = convertNames(textures_old, fromType, toType)
   except Exception:
     window.alert("Failed to convert names. Change the from/to setting.")
     return
@@ -178,21 +223,16 @@ fromCombobox.onChange=proc(event: ComboBoxChangeEvent) =
 toCombobox.onChange=proc(event: ComboBoxChangeEvent) =
   getNewNames()
 
-renameCheckbox.onClick=proc(event: ClickEvent) =
+renameField.onTextChange=proc(event: TextChangeEvent) =
+  
   if renameCheckbox.checked():
-    renameField.editable=false
-    renameField.setBackgroundColor(ColorDisabled)
+    let name = renameField.text
+    getNewNames(some(name))
   else:
-    renameField.editable=true
-    renameField.setBackgroundColor(ColorWhite)
+    discard
 
 renameButton.onClick=proc(event: ClickEvent) =
 
-  # let fromType = fromCombobox.value
-  # let toType = toCombobox.value
-  # if fromType == toType:
-  #   window.alert("Input type and output type is same.\nChoose different texture types.")
-  #   return
 
   let textAreaStr = fileListAreaBefore.text
   if textAreaStr == "":
